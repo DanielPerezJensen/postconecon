@@ -35,7 +35,8 @@ def get_colonist(cc3):
 crises_df = pd.read_csv('../data/african_crises.csv')
 
 # Replace values in banking_crisis with boolean values
-crises_df = crises_df.replace({'banking_crisis': {'crisis': 1, 'no_crisis': 0}})
+crises_df = crises_df.replace({'banking_crisis':
+                               {'crisis': 1, 'no_crisis': 0}})
 
 # Columns that signify what rows/years had crises
 crises_cols = ['systemic_crisis', 'domestic_debt_in_default',
@@ -54,39 +55,61 @@ bool_crises_df = crises_df_after_1957[['systemic_crisis',
 # Repeat n pairwise tests m times
 n, m = 10000, 1000
 
-# If the British ranks aren't statistically higher ranked than the French
+# If the French ranks aren't statistically higher ranked than the British
 # we would expect the mean of our test to fall within the 95%-CI of
 # a binomial distribution with p=0.5.
 binomial_samples = [np.random.binomial(n, 0.5) / n for _ in range(m)]
 
-FRA_samples, GBR_samples = [], []
+FRA_sample, GBR_sample = [], []
 ccs = crises_df['cc3'].unique()
+
 # For each country save the sum (amount of crisis years)
 for crisis in crises_cols:
     for cc in ccs:
         if get_colonist(cc) == 'FRA':
-            FRA_samples.append(bool_crises_df[crisis]
-                               .loc[bool_crises_df['cc3'] == cc].sum())
+            FRA_sample.append(bool_crises_df[crisis]
+                              .loc[bool_crises_df['cc3'] == cc].sum())
         if get_colonist(cc) == 'GBR':
-            GBR_samples.append(bool_crises_df[crisis]
-                               .loc[bool_crises_df['cc3'] == cc].sum())
+            GBR_sample.append(bool_crises_df[crisis]
+                              .loc[bool_crises_df['cc3'] == cc].sum())
+
+    # Calculate the mean of our pairwise_test
+    true_pairwise_mean = np.mean([pairwise_test(FRA_sample, GBR_sample, n)
+                                  for _ in range(m)])
+
+    # Resample our data using a multinomial distribution
+    gbr_p_values = np.array(GBR_sample) / len(bool_crises_df)
+    fra_p_values = np.array(FRA_sample) / len(bool_crises_df)
+
+    # TODO: Not sure if it should be length of sum
+    gbr_resamples = np.random.multinomial(len(bool_crises_df), gbr_p_values,
+                                          size=50)
+    fra_resamples = np.random.multinomial(len(bool_crises_df), fra_p_values,
+                                          size=50)
+
+    # Zip our samples together so we can use it with our pairwise test function
+    zipped_resamples = zip(fra_resamples, gbr_resamples)
+
+    # Run our pairwise test on each of the 50 new samples
+    resampled_pairwise_tests = [pairwise_test(f, g, n) for
+                                f, g in zipped_resamples]
 
     # Plotting stuff
     plt.title(crisis)
-    plt.xlabel('Percentage GBR > FRA')
+    plt.xlabel('Percentage FRA > GBR')
     plt.ylabel('Count')
     plt.hist(binomial_samples)
 
-    # Calculate the mean of our pairwise_test
-    pairwise_mean = np.mean([pairwise_test(GBR_samples, FRA_samples, n)
-                             for _ in range(m)])
-
     # Plot confidence interval and our calculated mean
-    plt.axvline(pairwise_mean, c='k', linestyle='--', label='pairwise mean')
+    plt.axvline(true_pairwise_mean, c='k', linestyle='--',
+                label='true pairwise mean')
     plt.axvline(np.percentile(binomial_samples, 1.25), color='g',
                 label='CI', linestyle=':')
     plt.axvline(np.percentile(binomial_samples, 97.5), color='g',
                 linestyle=':')
 
+    # Plot each of our resamples in magenta and low opaqueness
+    for resampled_test in resampled_pairwise_tests:
+        plt.axvline(resampled_test, c='m', linestyle='-', alpha=0.25)
     plt.legend()
     plt.show()
