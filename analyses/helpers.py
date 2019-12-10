@@ -12,6 +12,7 @@ SDA Project of Daniel Perez Jensen, Jelle Mouissie and Joos Akkerman
 This file contains helper functions.
 """
 
+
 def regions():
     """
     Gets meta data on region of countries
