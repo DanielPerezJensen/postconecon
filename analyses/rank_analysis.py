@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+from operator import add
 from helpers import get_colonist
 from scipy.stats import mannwhitneyu
 
@@ -24,13 +25,24 @@ bool_crises_df = crises_df_after_1957[['systemic_crisis', 'currency_crises',
                                        'inflation_crises', 'banking_crisis',
                                        'cc3']]
 
-n = 10000
+# Our parameters for the amount of resamples
+n, m = 10000, 10 ** 8
 
-fra_sample, gbr_sample = [], []
+# Our chosen significance level
+alpha = 0.05
+
+alternative = 'greater'
+
+# binom_dist = np.random.binomial(1000, alpha, m)
+
 ccs = crises_df['cc3'].unique()
+
+fra_total = [0 for cc in ccs if get_colonist(cc) == 'FRA']
+gbr_total = [0 for cc in ccs if get_colonist(cc) == 'GBR']
 
 # For each country save the sum (amount of crisis years)
 for crisis in crises_cols:
+    fra_sample, gbr_sample = [], []
     for cc in ccs:
         if get_colonist(cc) == 'FRA':
             fra_sample.append(bool_crises_df[crisis]
@@ -39,32 +51,16 @@ for crisis in crises_cols:
             gbr_sample.append(bool_crises_df[crisis]
                               .loc[bool_crises_df['cc3'] == cc].sum())
 
+    fra_total = [sum(x) for x in zip(fra_total, fra_sample)]
+    gbr_total = [sum(x) for x in zip(gbr_total, gbr_sample)]
+
     # Calculate the true left-sided p_value from the mann-whitney U test
-    true_p_value = mannwhitneyu(fra_sample, gbr_sample,
-                                alternative='greater').pvalue
+    true_p_value = mannwhitneyu(gbr_sample, fra_sample,
+                                alternative=alternative).pvalue
+    print(crisis, true_p_value)
 
-    # Resample using a multinomial distribution
-    full_sample = fra_sample + gbr_sample
-    full_sample_probs = np.array(full_sample) / np.sum(full_sample)
-    resamples = np.random.multinomial(np.sum(full_sample),
-                                      full_sample_probs, size=n)
-
-    # Run our pairwise test on each of the n new samples
-    resampled_mannwhitneyu = [mannwhitneyu(r[:len(fra_sample)], r[len(fra_sample):],
-                              alternative='greater').pvalue for r in resamples]
-
-    # Plotting stuff
-    plt.figure()
-    plt.title(f'left sided test p-values of {crisis.replace("_", " ")}')
-    plt.xlabel('p-value')
-    plt.ylabel('Count')
-    plt.hist(resampled_mannwhitneyu, bins=int(np.sqrt(n)))
-
-    # Plot our true p_value
-    plt.axvline(true_p_value, c='k', linestyle='--',
-                label='true p-value')
-    plt.axvline(np.mean(resampled_mannwhitneyu), c='m', linestyle=':',
-                label='mean')
-
-    plt.legend()
-    plt.savefig(f'rank_figs/{crisis.replace("_", " ")}-pval-dist')
+# Calculate the true left-sided p_value from the mann-whitney U test of
+# the sum of our samples
+true_p_value = mannwhitneyu(gbr_total, fra_total,
+                            alternative=alternative).pvalue
+print('summed total', true_p_value)
