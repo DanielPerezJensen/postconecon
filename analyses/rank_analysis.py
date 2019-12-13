@@ -8,85 +8,83 @@ from helpers import prepare_data
 from scipy.stats import mannwhitneyu as mwu
 
 
-def plot_ranks(ranked_data, crisis, countries, colors):
+def plot_ranks(dataframe, countries):
+
+    # For each country plot the amount of years in crisis as a bar
+    for crisis in dataframe:
+        # Skip over the country code column
+        if crisis == "cc3":
+            continue
+
+        ranked_data = []
+        for cc in countries:
+            ranked_data.append(dataframe[crisis]
+                               .loc[dataframe["cc3"] == cc].sum())
+
+    countries, ranked_data = zip(*[(x, y) for y, x in
+                                   sorted(zip(ranked_data, countries))])
+
+    colors = ["r" if get_colonist(cc) == "GBR" else "b" for cc in countries]
+
     plt.figure()
     plt.title(f"No. of years: {crisis.replace('_', ' ')}")
     plt.xlabel("Country")
     plt.ylabel("No. of years")
-    countries, ranked_data = zip(*[(x, y) for y, x in
-                                   sorted(zip(ranked_data, countries))])
     plt.bar(countries, ranked_data, color=colors)
     plt.savefig(f"rank_figs/ranked_data_{crisis}")
 
 
-crises_df = pd.read_csv("../data/african_crises.csv")
+def prepare_data():
 
-# Columns that signify what rows/years had crises
-crises_cols = ["systemic_crisis", "currency_crises", "inflation_crises",
-               "banking_crisis"]
+    crises_df = pd.read_csv("../data/african_crises.csv")
 
-# Get the columns and start year we want
-bool_crises_df = prepare_data(crises_df, crises_cols + ["cc3"], 1957)
+    # Columns that signify what rows/years had crises
+    crises_cols = ["systemic_crisis", "currency_crises", "inflation_crises",
+                   "banking_crisis"]
 
-# Our parameters for the amount of resamples
-n, m = 10000, 10 ** 8
+    # Replace values in banking_crisis with boolean values
+    crises_df = crises_df.replace({"banking_crisis":
+                                   {"crisis": 1, "no_crisis": 0}})
+    crises_df = crises_df[crises_df["year"] > 1957]
 
-# Our chosen significance level and side of test
-# greater signifies that y's distribution is greater than x's distribution
-alpha = 0.05
-alternative = "greater"
+    # Gather all boolean crises from after 1957
+    return crises_df[crises_cols + ["cc3"]], crises_df["cc3"].unique()
 
-binom_dist = np.random.binomial(n, alpha, m)
 
-# Gather all french and british former colony country codes
-ccs = bool_crises_df["cc3"].unique()
+# Gather our dataframe and the countries we have minus the portuguese colonies
+crises_df, ccs = prepare_data()
 ccs = [cc for cc in ccs if get_colonist(cc) != "PRT"]
 
-fra_total = [0 for cc in ccs if get_colonist(cc) == "FRA"]
-gbr_total = [0 for cc in ccs if get_colonist(cc) == "GBR"]
+# Plot the bar plots that vizualise the data the mwu-test is performed over
+plot_ranks(crises_df, ccs)
 
-french_colonies = [cc for cc in ccs if get_colonist(cc) == "FRA"]
-british_colonies = [cc for cc in ccs if get_colonist(cc) == "GBR"]
 
-# For each country save the sum (amount of crisis years)
-for crisis in crises_cols:
-    fra_sample, gbr_sample = [], []
-    countries, colors = [], []
-    for cc in ccs:
-        if get_colonist(cc) == "FRA":
-            fra_sample.append(bool_crises_df[crisis]
-                              .loc[bool_crises_df["cc3"] == cc].sum())
-            colors.append('b')
-        if get_colonist(cc) == "GBR":
-            gbr_sample.append(bool_crises_df[crisis]
-                              .loc[bool_crises_df["cc3"] == cc].sum())
-            colors.append('r')
+# Perform the mann whitney u test for each tail
+for alternative in ["less", "greater"]:
+    for crisis in crises_df:
+        # Skip over country code column
+        if crisis == "cc3":
+            continue
 
-    plot_ranks(gbr_sample + fra_sample, crisis, ccs, colors)
+        fra_sample, gbr_sample = [], []
+        # Gather each countries data
+        for cc in ccs:
+            if get_colonist(cc) == "FRA":
+                fra_sample.append(crises_df[crisis]
+                                  .loc[crises_df["cc3"] == cc].sum())
+            elif get_colonist(cc) == "GBR":
+                gbr_sample.append(crises_df[crisis]
+                                  .loc[crises_df["cc3"] == cc].sum())
 
-    # Calculate the true left-sided p_value from the mann-whitney U test
-    true_p_value = mwu(gbr_sample, fra_sample, alternative=alternative).pvalue
-
-    # In case the p value is lower than alpha, we reject H1 and add
-    # some noise to the bar heights using a multinomial distribution
-    if true_p_value < alpha:
-        # Gather the probabilities of our found sample
-        comb_sample = fra_sample + gbr_sample
-        comb_probs = np.array(comb_sample) / np.sum(comb_sample)
-        resamples = np.random.multinomial(np.sum(comb_sample), comb_probs,
-                                          size=n)
-        resampled_p_values = [mwu(r[len(fra_sample):], r[:len(fra_sample)],
-                                  alternative=alternative).pvalue
-                              for r in resamples]
-        # Count the amount of resampled p-values that are below alpha
-        below_alpha_count = len([p for p in resampled_p_values if p <= alpha])
-        plt.figure()
-        plt.hist(binom_dist)
-        plt.axvline(below_alpha_count, linestyle=":", label="count", color="g")
-        plt.axvline(np.percentile(binom_dist, 2.5), linestyle="--",
-                    label="95% CI", color="r")
-        plt.axvline(np.percentile(binom_dist, 97.5), linestyle="--", color="r")
-        plt.legend()
-        plt.show()
-
-    print(crisis, true_p_value)
+        # Print our results and hypotheses
+        print(f"H0: {crisis} distribution is the same for former British " +
+              "and French colonies.")
+        print(f"H1: {crisis} distribution is {alternative} for former " +
+              "British colonies compared to former French colonies.")
+        print("Note: In our case a greater distribution would equal " +
+              "a less stable economy")
+        print()
+        mwuresult = mwu(gbr_sample, fra_sample, alternative=alternative)
+        print("U statistic:", mwuresult.statistic)
+        print("P-value:    ", mwuresult.pvalue)
+        print()
