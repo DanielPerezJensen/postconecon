@@ -55,3 +55,14 @@ def get_colonist(cc3):
             return colonist
 
     return False
+
+
+def prepare_data(dataframe, columns, start_year):
+
+    # Replace values in banking_crisis with boolean values
+    dataframe = dataframe.replace({"banking_crisis":
+                                   {"crisis": 1, "no_crisis": 0}})
+    dataframe = dataframe[dataframe["year"] > start_year]
+
+    # Gather all boolean crises from after 1957
+    return dataframe[columns]
