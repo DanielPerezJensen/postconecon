@@ -13,20 +13,20 @@ This file collects nominal GDP data, computes indeces, plots results and
 performs statistical tests on indeces.
 """
 
-GDPdata = 'GDP_Worldbank.csv'
+GDPdata = '../data/GDP_Worldbank.csv'
 startyear = 1960
 endyear = 2014
 
 # collect country and category data from text files and save as global
-with open('AfricanCountriesCode.txt', 'r') as codes:
+with open('../data/AfricanCountriesCode.txt', 'r') as codes:
     codes = codes.read()
     AfricanCountriesCode = ast.literal_eval(codes)
 
-with open('AfricanCountriesCode.txt', 'r') as names:
+with open('../data/AfricanCountriesName.txt', 'r') as names:
     names = names.read()
     AfricanCountriesName = ast.literal_eval(names)
 
-with open('col_names.txt', 'r') as all_col:
+with open('../data/col_names.txt', 'r') as all_col:
     all_col = all_col.read()
     all_col = ast.literal_eval(all_col)
 
@@ -122,7 +122,7 @@ def vis_index(GDPdata_index, GDPdata_index_percol, years):
     plt.xlabel('Time')
     plt.title('Indexes for GDP of african country, categorized by former colonial overlord.')
     plt.legend()
-    plt.show()
+    plt.savefig('gdp_index_figs/GDP_index1.png')
 
 
 if __name__ == '__main__':
