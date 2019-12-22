@@ -4,7 +4,7 @@ import numpy as np
 import scipy.stats as stats
 import ast
 
-GDPdataMeta = 'Metadata_worldbank.csv'
+GDPdataMeta = '../data/Metadata_worldbank.csv'
 
 """
 SDA Project of Daniel Perez Jensen, Jelle Mouissie and Joos Akkerman
@@ -28,7 +28,7 @@ def regions():
             AfricanCountriesName.append(row['TableName'])
 
     # North Africa and Middle East are grouped together, so North African
-    # countries have to be added manually:
+    # countries have to be added manually (no data for Libya):
     NorthAfricaCodes = ['MAR', 'DZA', 'TUN', 'EGY']
     NorthAfricaNames = ['Morocco', 'Algeria', 'Tunisia', 'Egypt']
 
@@ -45,7 +45,9 @@ def regions():
 
 
 def get_colonist(cc3):
-    """Returns the 3 letter country code of the colonizer of cc3"""
+    """
+    Returns the 3 letter country code of the colonizer of cc3
+    """
     colonists_dict = {'GBR': ['EGY', 'KEN', 'NGA', 'ZAF', 'ZMB', 'ZWE', 'MUS'],
                       'FRA': ['DZA', 'CIV', 'CAF', 'MAR', 'TUN'],
                       'PRT': ['AGO']}
@@ -55,3 +57,14 @@ def get_colonist(cc3):
             return colonist
 
     return False
+
+
+def prepare_data(dataframe, columns, start_year):
+
+    # Replace values in banking_crisis with boolean values
+    dataframe = dataframe.replace({"banking_crisis":
+                                   {"crisis": 1, "no_crisis": 0}})
+    dataframe = dataframe[dataframe["year"] > start_year]
+
+    # Gather all boolean crises from after 1957
+    return dataframe[columns]

@@ -3,9 +3,7 @@ import pandas as pd
 import numpy as np
 import scipy.stats as stats
 import ast
-# from sklearn import linear_model
 import statsmodels.api as sm
-# from scipy import stats
 
 import helpers
 
@@ -52,22 +50,24 @@ def GDPgrowth(AfricanCountriesCode):
     growth_GB = []
     growth_All = []
 
+    # extract growth data from csv
     for country in ['FRA', 'GBR', 'WLD']:
         df2 = df.loc[df['Country Code'] == country, str(years[0]):str(years[-1])]
         df2 = df2.values[0]
         GDPgrowth_percountry[country] = df2
 
     for country in AfricanCountriesCode:
-        if country in col_France or country in col_GB:
+        if country in col_France_GB:
             df3 = df.loc[df['Country Code'] == country, str(years[0]):str(years[-1])]
             df3 = df3.values[0]
-
             GDPgrowth_percountry[country] = df3
 
-    # categorize growth numbers by colonial overlord:
+    # categorize growth numbers by colonizer:
     nFrance = 0
     nGB = 0
+    complete_countries = []
     for country in GDPgrowth_percountry:
+
         # check if data is complete
         complete_data = True
         for gdpval in GDPgrowth_percountry[country]:
@@ -75,13 +75,16 @@ def GDPgrowth(AfricanCountriesCode):
                 complete_data = False
 
         if complete_data:
-            growth_All += GDPgrowth_percountry[country].tolist()
             if country in col_France:
                 nFrance += 1
+                complete_countries.append(country)
                 growth_France += GDPgrowth_percountry[country].tolist()
+                growth_All += GDPgrowth_percountry[country].tolist()
             elif country in col_GB:
                 nGB += 1
+                complete_countries.append(country)
                 growth_GB += GDPgrowth_percountry[country].tolist()
+                growth_All += GDPgrowth_percountry[country].tolist()
 
     # calculate stats to fit normal distribution:
     avg_France = np.mean(growth_France)
@@ -96,79 +99,55 @@ def GDPgrowth(AfricanCountriesCode):
     statAll = {'avg': avg_All, 'stddev': stddev_All, 'n_countries': nGB + nFrance, 'n_sample': len(growth_All)}
 
     growth_stats = [statFrance, statGB, statAll]
-    # print(growth_stats)
     growth_percol = [growth_France, growth_GB, growth_All]
 
-    jellepelle = stats.ttest_ind(growth_France, growth_GB, axis=0, equal_var=True, nan_policy='propagate')
-    print(jellepelle)
-
-    return GDPgrowth_percountry, growth_percol, growth_stats
+    return GDPgrowth_percountry, growth_percol, growth_stats, complete_countries
 
 
-def regress_growth(GDPgrowth_percountry):
+def ttest(data1, data2, name1, name2):
+    """
+    Performs a t-test for the distribution of two samples
+    """
+    t_test = stats.ttest_ind(data1, data2, axis=0, equal_var=True, nan_policy='propagate')
+    print(f'\n\nt-test for difference between {name1} and {name2}.')
+    print(f'Results t-test:\n {t_test}\n\n')
+
+
+def regress_growth(GDPgrowth_percountry, reg1, reg2):
     """
     Regresses the growth rates of countries
     """
-    corr_wld = []
-    pval_wld = []
-    corr_afr = []
-    pval_afr = []
+    all_corr = []
+    all_pval = []
 
-    for country in ['FRA', 'GBR', 'WLD']:
+    for country1 in reg1:
         corr = []
         pval = []
-        for Afrcountry in col_France_GB:
-            regress = stats.linregress(GDPgrowth_percountry[country], GDPgrowth_percountry[Afrcountry])
+        for country2 in reg2:
+            regress = stats.linregress(GDPgrowth_percountry[country1], GDPgrowth_percountry[country2])
             r_value = regress[2]
             p_value = regress[3]
             corr.append(r_value)
             pval.append(p_value)
 
-        corr_wld.append(corr)
-        pval_wld.append(pval)
+        all_corr.append(corr)
+        all_pval.append(pval)
+
+    return np.array(all_corr), np.array(all_pval)
 
 
-    corr_wld=np.array(corr_wld)
-    pval_wld=np.array(pval_wld)
-
-    for Afrcountry1 in col_France_GB:
-        corr = []
-        pval = []
-        for Afrcountry2 in col_France_GB:
-            regress = stats.linregress(GDPgrowth_percountry[Afrcountry1], GDPgrowth_percountry[Afrcountry2])
-            r_value = regress[2]
-            p_value = regress[3]
-            corr.append(r_value)
-            pval.append(p_value)
-
-        corr_afr.append(corr)
-        pval_afr.append(pval)
-
-    corr_afr = np.array(corr_afr)
-    pval_afr = np.array(pval_afr)
-
-    return corr_wld, pval_wld, corr_afr, pval_afr
-
-
-def regres_model(GDPgrowth_percountry):
+def regress_model(GDPgrowth_percountry):
     """
     Runs a mulivariate regression for GDP growth rates
     """
     growth_WLD = GDPgrowth_percountry['WLD'].tolist()
-    del growth_WLD[0]
-    del growth_WLD[0]
+    del growth_WLD[0:2]
     growth_FRA = GDPgrowth_percountry['FRA'].tolist()
-    del growth_FRA[0]
-    del growth_FRA[0]
+    del growth_FRA[0:2]
     growth_GBR = GDPgrowth_percountry['GBR'].tolist()
-    del growth_GBR[0]
-    del growth_GBR[0]
+    del growth_GBR[0:2]
 
-    df = pd.read_csv(worldtradedata)
-    tradevol = df['value'].tolist()
-    tradegrowth = [100*(tradevol[i+3]-tradevol[i+2])/tradevol[i+2] for i in range(len(tradevol)-3)]
-
-    all_regres = {}
+    all_regress = {}
     growth_dat = {}
     for country in GDPgrowth_percountry:
         complete_data = True
@@ -178,10 +157,8 @@ def regres_model(GDPgrowth_percountry):
 
         if complete_data:
             if country in col_France_GB:
-            # collect relevant data
                 growth = GDPgrowth_percountry[country].tolist()
-                del growth[0]
-                del growth[0]
+                del growth[0:2]
                 growth_1 = GDPgrowth_percountry[country].tolist()
                 del growth_1[0]
                 del growth_1[-1]
@@ -190,40 +167,94 @@ def regres_model(GDPgrowth_percountry):
                 del growth_2[-1]
 
                 data = {'growth': growth, 'growth_1': growth_1, 'growth_2': growth_2,
-                        'WLD': growth_WLD, 'FRA': growth_FRA, 'GBR': growth_GBR,
-                        'Trade': tradegrowth}
+                        'WLD': growth_WLD, 'FRA': growth_FRA, 'GBR': growth_GBR}
 
                 # run multiple linear regression
                 df = pd.DataFrame(data, columns=['growth', 'growth_1', 'growth_2',
-                                                    'WLD', 'FRA', 'GBR', 'Trade'])
-                # df = pd.DataFrame(data, columns=['growth', 'growth_1', 'growth_2',
-                                                    # 'WLD', 'FRA'])
+                                                    'WLD', 'FRA', 'GBR'])
 
-                X = df[['growth_1', 'growth_2', 'WLD', 'FRA', 'GBR', 'Trade']]
-                # X = df[['growth_1', 'growth_2', 'WLD', 'FRA']]
+                # used for imperfect multicollinearity tests
+                X = df[['growth_1', 'growth_2', 'WLD', 'FRA', 'GBR']]
+                # X = df[['growth_1', 'growth_2', 'FRA', 'GBR']]
+                # X = df[['growth_1', 'growth_2', 'WLD']]
+
                 Y = df['growth']
                 X2 = sm.add_constant(X)
                 regr = sm.OLS(Y, X2)
                 regr = regr.fit()
 
-                all_regres[country] = {'a': regr.params['const'], 'b1': regr.params['growth_1'],
-                                        'b2': regr.params['growth_2'], 'b3': regr.params['WLD'],
-                                        'b4': regr.params['FRA'], 'b5': regr.params['GBR'],
-                                        'b6': regr.params['Trade']}
+                all_regress[country] = {'a': regr.params['const'], 'pa': regr.pvalues['const'],
+                                        'b1': regr.params['growth_1'], 'pb1': regr.pvalues['growth_1'],
+                                        'b2': regr.params['growth_2'], 'pb2': regr.pvalues['growth_2'],
+                                        'b3': regr.params['WLD'], 'pb3': regr.pvalues['WLD'],
+                                        'b4': regr.params['FRA'], 'pb4': regr.pvalues['FRA'],
+                                        'b5': regr.params['GBR'], 'pb5': regr.pvalues['GBR'],
+                                        'R': regr.rsquared, 'adjR': regr.rsquared_adj}
 
-                print(AfricanCountriesName[AfricanCountriesCode.index(country)], country)
+                print(f'\nRegression Summary for {AfricanCountriesName[AfricanCountriesCode.index(country)]}, {country}:')
                 print(regr.summary())
 
                 growth_dat[country] = [growth, growth_1, growth_2]
 
 
-    print(len(growth_WLD))
-    used_dat = [growth_WLD, growth_FRA, growth_GBR, growth_dat, tradegrowth]
+    used_dat = [growth_WLD, growth_FRA, growth_GBR, growth_dat]
 
-    return all_regres, used_dat
+    return all_regress, used_dat
 
 
-def vis_growth(GDPgrowth_percountry, growth_percol, growth_stats):
+def countsig(all_regress):
+    """
+    Count all significant measurements and R squared values for regression models
+    """
+    sig_WLD_FRA = 0
+    sig_FRA_FRA = 0
+    sig_GBR_FRA = 0
+    sig_WLD_GBR = 0
+    sig_FRA_GBR = 0
+    sig_GBR_GBR = 0
+    R_FRA = 0
+    adjR_FRA = 0
+    R_GBR = 0
+    adjR_GBR = 0
+
+    for country in all_regress:
+        if country in col_France:
+            R_FRA += all_regress[country]['R']
+            adjR_FRA += all_regress[country]['adjR']
+            if all_regress[country]['pb3'] <= 0.05:
+                sig_WLD_FRA += 1
+            elif all_regress[country]['pb4'] <= 0.05:
+                sig_FRA_FRA += 1
+            elif all_regress[country]['pb5'] <= 0.05:
+                sig_GBR_FRA += 1
+        elif country in col_GB:
+            R_GBR += all_regress[country]['R']
+            adjR_GBR += all_regress[country]['adjR']
+            if all_regress[country]['pb3'] <= 0.05:
+                sig_WLD_GBR += 1
+            elif all_regress[country]['pb4'] <= 0.05:
+                sig_FRA_GBR += 1
+            elif all_regress[country]['pb5'] <= 0.05:
+                sig_GBR_GBR += 1
+
+    R_FRA = R_FRA/13
+    R_GBR = R_GBR/13
+    adjR_FRA = adjR_FRA/13
+    adjR_GBR = adjR_GBR/13
+
+    print(f'R^2 for former French colonies is {R_FRA}.')
+    print(f'Adjusted R^2 for former French colonies is {adjR_FRA}.')
+    print(f'R^2 for former British colonies is {R_GBR}.')
+    print(f'Adjusted R^2 for former British colonies is {adjR_GBR}.')
+    print(f'sig FRA for FRA {sig_FRA_FRA}')
+    print(f'sig FRA for WLD {sig_WLD_FRA}')
+    print(f'sig FRA for GBR {sig_GBR_FRA}')
+    print(f'sig GBR for FRA {sig_FRA_GBR}')
+    print(f'sig GBR for WLD {sig_WLD_GBR}')
+    print(f'sig GBR for GBR {sig_GBR_GBR}')
+
+
+def vis_growth_hist(GDPgrowth_percountry, growth_percol, growth_stats):
     """
     Visualizes distribution of growth numbers
     """
@@ -245,8 +276,14 @@ def vis_growth(GDPgrowth_percountry, growth_percol, growth_stats):
     plt.legend(loc='upper left')
     plt.savefig('gdp_growth_figs/gdp_growth_hist.png')
 
+
+def vis_growth_line(GDPgrowth_percountry):
+    """
+    Visualises growth rates as time series
+    """
     time = np.arange(startyear, endyear+1, 1)
 
+    # set color based on country name
     def color(country):
         if country in col_France:
             return 'blue'
@@ -261,7 +298,7 @@ def vis_growth(GDPgrowth_percountry, growth_percol, growth_stats):
 
     def alpha(country):
         if country in col_France or country in col_GB:
-            return 0.2
+            return 0.15
         else:
             return 1.0
 
@@ -283,84 +320,83 @@ def vis_growth(GDPgrowth_percountry, growth_percol, growth_stats):
     plt.savefig('gdp_growth_figs/gdp_growth_time.png')
 
 
-def vis_regress_heat(corr_wld, pval_wld, corr_afr, pval_afr):
+def vis_regress_heat(corr, pval, vert, name):
     """
     Visualized regression values in heat map
     """
-
     countries_name = [AfricanCountriesName[AfricanCountriesCode.index(el)] for el in col_France_GB]
-
-    wld = ['France', 'Great Britain', 'World']
-    plt.figure()
-    plt.imshow(corr_wld)
-    plt.yticks([0,1,2], wld)
-    plt.xticks(range(len(countries_name)), countries_name, rotation='vertical')
-    plt.title(f'GDP growth correlation for {startyear} - {endyear}')
-    plt.savefig('gdp_growth_figs/gdp_regress_WLD.png')
+    if name == 'AFR':
+        vert = countries_name
 
     plt.figure()
-    plt.imshow(corr_afr)
-    plt.yticks(range(len(countries_name)), countries_name)
+    plt.imshow(corr)
+    plt.yticks(range(len(vert)), vert)
     plt.xticks(range(len(countries_name)), countries_name, rotation='vertical')
     plt.title(f'GDP growth correlation in African countries for {startyear} - {endyear}')
-    plt.savefig('gdp_growth_figs/gdp_regress_AFR.png')
+    plt.savefig(f'gdp_growth_figs/gdp_regress_{name}.png')
 
 
-def vis_regress_model(all_regres, GDPgrowth_percountry, used_dat):
+def vis_regress_model(all_regress, GDPgrowth_percountry, used_dat, complete_countries):
     """
     Visualises time series with estimated model.
     """
-    # get used data
-    country = 'KEN'
-    rval = all_regres[country]
-    WLD = used_dat[0]
-    FRA = used_dat[1]
-    GBR = used_dat [2]
-    tradegrowth = used_dat[4]
-    growth_dat = used_dat[3][country]
-    growth = growth_dat[0]
-    growth_1 = growth_dat[1]
-    growth_2 = growth_dat[2]
-
     # set timescales
-    # time = np.arange(startyear, endyear + 1, 1)
     time = np.arange(startyear + 2, endyear + 1, 1)
 
-    # get model parameters
-    a = rval['a']
-    b1 = rval['b1']
-    b2 = rval['b2']
-    b3 = rval['b3']
-    b4 = rval['b4']
-    b5 = rval['b5']
-    b6 = rval['b6']
+    for country in complete_countries:
+        rval = all_regress[country]
+        WLD = used_dat[0]
+        FRA = used_dat[1]
+        GBR = used_dat [2]
+        growth_dat = used_dat[3][country]
+        growth = growth_dat[0]
+        growth_1 = growth_dat[1]
+        growth_2 = growth_dat[2]
 
-    # estimate values using parameters in data
-    est_val = [a+b1*growth_1[i]+b2*growth_2[i]+b3*WLD[i]+b4*FRA[i]+b5*GBR[i]
-                +b6*tradegrowth[i] for i in range(len(WLD))]
+        # get model parameters
+        a = rval['a']
+        b1 = rval['b1']
+        b2 = rval['b2']
+        b3 = rval['b3']
+        b4 = rval['b4']
+        b5 = rval['b5']
+        adjR = round(rval['adjR'], 2)
 
-    country = AfricanCountriesName[AfricanCountriesCode.index(country)]
+        # estimate values using parameters in data
+        est_val = [a+b1*growth_1[i]+b2*growth_2[i]+b3*WLD[i]+b4*FRA[i]+b5*GBR[i]
+                    for i in range(len(WLD))]
 
-    plt.figure()
-    plt.plot(time, growth, label='Real growth')
-    plt.plot(time, est_val, label='Estimated growth')
-    plt.legend()
-    plt.title(f'Real and estimated values of GDP growth for {country}.')
-    plt.xlabel('time')
-    plt.ylabel('GDP growth')
-    plt.show()
+        # get country name
+        country_name = AfricanCountriesName[AfricanCountriesCode.index(country)]
+
+        # plot graphs and save
+        plt.figure()
+        plt.plot(time, growth, label='Real growth')
+        plt.plot(time, est_val, label='Estimated growth')
+        plt.legend()
+        plt.title(f'Real and estimated values of GDP growth for {country_name} (adj R^2={adjR}).')
+        plt.xlabel('time')
+        plt.ylabel('GDP growth')
+        plt.savefig(f'gdp_growth_figs/gdp_growth_model_{country}.png')
 
 
 if __name__ == '__main__':
 
-    GDPgrowth_percountry, growth_percol, growth_stats = GDPgrowth(AfricanCountriesCode)
+    GDPgrowth_percountry, growth_percol, growth_stats, complete_countries = GDPgrowth(AfricanCountriesCode)
 
-    # vis_growth(GDPgrowth_percountry, growth_percol, growth_stats)
+    ttest(growth_percol[0], growth_percol[1], 'French ex-colonies', 'British ex-colonies')
 
-    # corr_wld, pval_wld, corr_afr, pval_afr = regress_growth(GDPgrowth_percountry)
+    vis_growth_hist(GDPgrowth_percountry, growth_percol, growth_stats)
+    vis_growth_line(GDPgrowth_percountry)
 
-    all_regres, used_dat = regres_model(GDPgrowth_percountry)
+    corr_wld, pval_wld = regress_growth(GDPgrowth_percountry, ['FRA', 'GBR', 'WLD'], col_France_GB)
+    corr_afr, pval_afr = regress_growth(GDPgrowth_percountry, col_France_GB, col_France_GB)
 
-    # vis_regress_heat(corr_wld, pval_wld, corr_afr, pval_afr)
+    vis_regress_heat(corr_wld, pval_wld, ['France', 'Great Britain', 'World'], 'WLD')
+    vis_regress_heat(corr_afr, pval_afr, [], 'AFR')
 
-    vis_regress_model(all_regres, GDPgrowth_percountry, used_dat)
+    all_regress, used_dat = regress_model(GDPgrowth_percountry)
+
+    countsig(all_regress)
+
+    vis_regress_model(all_regress, GDPgrowth_percountry, used_dat, complete_countries)
