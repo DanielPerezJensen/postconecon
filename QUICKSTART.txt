@@ -1,0 +1,14 @@
+We'll show how to use our code in the same order of our presentation. 
+
+part 1:
+test 1: 
+Run the rank_analysis.py file the results will be stored in the rank_figs folder. 
+test 2:
+In the python notebook clustering.ipynb you can find all the code used to generate the clusteringdistancematrix.png 
+
+Part 2:
+test 1:
+for the results of the gdp growth/index analysis run the gdo_growth_analysis.py en gdp_index_analysis.py files. After running both files you'll find the result in the gdp_growth_figs and gdp_index_figs folders
+
+test 2:
+All heatmaps are generated in clustering.ipynb the results are stored in the heatmaps folder

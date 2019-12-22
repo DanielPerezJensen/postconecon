@@ -22,7 +22,8 @@ with open('../data/AfricanCountriesCode.txt', 'r') as codes:
     codes = codes.read()
     AfricanCountriesCode = ast.literal_eval(codes)
 
-with open('../data/AfricanCountriesName.txt', 'r') as names:
+with open('../data/AfricanCountriesName.txt', 'r',
+            encoding='utf-8', errors='ignore') as names:
     names = names.read()
     AfricanCountriesName = ast.literal_eval(names)
 

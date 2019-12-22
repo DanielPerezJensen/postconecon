@@ -21,17 +21,18 @@ def plot_ranks(dataframe, countries):
             ranked_data.append(dataframe[crisis]
                                .loc[dataframe["cc3"] == cc].sum())
 
-    countries, ranked_data = zip(*[(x, y) for y, x in
+            countries, ranked_data = zip(*[(x, y) for y, x in
                                    sorted(zip(ranked_data, countries))])
 
-    colors = ["r" if get_colonist(cc) == "GBR" else "b" for cc in countries]
+            colors = ["r" if get_colonist(cc) == "GBR" else "b" for cc in countries]
 
-    plt.figure()
-    plt.title(f"No. of years: {crisis.replace('_', ' ')}")
-    plt.xlabel("Country")
-    plt.ylabel("No. of years")
-    plt.bar(countries, ranked_data, color=colors)
-    plt.savefig(f"rank_figs/ranked_data_{crisis}")
+            plt.figure()
+            plt.title(f"No. of years: {crisis.replace('_', ' ')}")
+            plt.xlabel("Country")
+            plt.ylabel("No. of years")
+            plt.bar(countries, ranked_data, color=colors)
+            plt.savefig(f"rank_figs/ranked_data_{crisis}")
+            plt.show()
 
 
 def prepare_data():
